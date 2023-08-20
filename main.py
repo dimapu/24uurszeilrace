@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+LON_FACTOR = 0.6088
+
 # %% Read data
 raw_data_fn = Path(__file__).parent / "_data/raw.xlsx"
 df_bouys: pd.DataFrame = pd.read_excel(raw_data_fn, "buoys")
@@ -61,8 +63,10 @@ df_stretches = pd.merge(
 )
 df_stretches["dx"] = (df_stretches["lon_start"] - df_stretches["lon_end"]) * 60
 df_stretches["dy"] = (df_stretches["lat_start"] - df_stretches["lat_end"]) * 60
+df_stretches["dx_nm"] = df_stretches["dx"] * LON_FACTOR
+df_stretches["dy_nm"] = df_stretches["dy"]
 df_stretches["dist"] = np.sqrt(
-    (df_stretches["dx"] * 0.6) ** 2 + df_stretches["dy"] ** 2
+    df_stretches["dx_nm"] ** 2 + df_stretches["dy"] ** 2
 )
 df_stretches["distance_diff"] = df_stretches["Afstand"] - df_stretches["dist"]
 
@@ -74,9 +78,9 @@ n_found = len(df_stretches_plot)
 
 print(f"{n_total=}, {n_found=}, n_not_found={n_total-n_found}")
 
-# Plot points and edges 
+# Plot points and edges
 ax = sns.scatterplot(data=df_bouys, x="lon", y="lat", style="Zone", hue="Zone")
-ax.set_aspect(1 / 0.6)
+ax.set_aspect(1 / LON_FACTOR)
 
 for i, r in df_stretches_plot.iterrows():
     sx, sy = r["lon_start"], r["lat_start"]
