@@ -9,7 +9,11 @@ SPEED_SPLINE = PchipInterpolator(BEARINGS, SPEED)
 
 
 def calculate_pointing_angle(coarse: float, wind_direction: float) -> float:
+    assert 0 <= wind_direction < 360, "wind direction must be in [0, 360)" 
+    
     pointing_angle =  np.abs(- np.abs((coarse - wind_direction) - 180) + 180)
+    pointing_angle = -np.abs(-(pointing_angle - 180)) + 180
+    
     return pointing_angle
 
 
@@ -47,7 +51,7 @@ def plot_speed_profile():
     
     wind = 90
     
-    coarse = np.linspace(0, 360)
+    coarse = np.linspace(0, 360, 360)
     plt.plot(coarse, get_speed(coarse, wind))
     plt.xticks([0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360])
     plt.grid(True)
@@ -59,7 +63,7 @@ def plot_speed_profile():
 def main():
     plt.close("all")
     # plot_speed_profile()
-    plot_pointing_angle_profile(359)
+    plot_pointing_angle_profile(340)
 
 
 if __name__ == "__main__":
