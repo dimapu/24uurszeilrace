@@ -12,7 +12,11 @@ def convert_coordinate(c: str) -> float:
         .replace('"', " ")
         .replace(",", ".")
     )
-    deg, minutes, direction = new.split()
+    try:
+        deg, minutes, direction = new.split()
+    except Exception as e:
+        print(new)
+        raise e
     return int(deg) + float(minutes) / 60.0
 
 

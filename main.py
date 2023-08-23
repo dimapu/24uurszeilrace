@@ -1,102 +1,68 @@
 from pathlib import Path
-
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import networkx as nx
 
-from coordinates import convert_coordinate, get_direction
+from data import LON_FACTOR
+
+from data import read_data, normalize_data, calculate_distances, filter_location
 from speed import get_speed
 
-LON_FACTOR = 0.6088
+bouys, legs = read_data()
+bouys, legs = normalize_data(bouys, legs)
+legs = calculate_distances(bouys, legs)
+bouys, legs  = filter_location(bouys, legs)
+    
 
-plt.close("all")
+WIND = 90
 
-# %% Read data
-raw_data_fn = Path(__file__).parent / "_data/raw.xlsx"
-df_bouys: pd.DataFrame = pd.read_excel(raw_data_fn, "buoys")
-df_stretches: pd.DataFrame = pd.read_excel(raw_data_fn, "stretches")
+legs["speed"] = get_speed(legs.heading.values, WIND)
+legs["reverse_speed"] = get_speed(legs.reverse_heading.values, WIND)
 
-# %% Normalize data
-df_bouys["name"] = (
-    df_bouys["Name"].str.replace(" ", "").str.replace("-", "").str.upper()
-)
-df_bouys["lat"] = df_bouys["Lat"].apply(convert_coordinate)
-df_bouys["lon"] = df_bouys["Lon"].apply(convert_coordinate)
-df_bouys.set_index("name", inplace=True)
-df_bouys = df_bouys[["Zone", "lat", "lon"]]
+legs.info()
 
-df_stretches["start"] = df_stretches["Start"].str.replace("-", "").str.upper()
-df_stretches["end"] = df_stretches["Eind"].str.replace("-", "").str.upper()
-df_stretches["Afstand"] = (
-    df_stretches["Afstand"].str.replace(",", ".").astype(float)
-)
-df_stretches = df_stretches[["Afstand", "Max Aantal", "type", "start", "end"]]
+# a = legs["lat_start"] < legs["lat_end"]
+
+# b = legs["lon_start"] < legs["lon_end"]
 
 
-# %% Get edge coordinates and distances, start and end
-df_stretches = pd.merge(
-    df_stretches,
-    df_bouys,
-    left_on="start",
-    right_on="name",
-    how="left",
-)
-df_stretches = pd.merge(
-    df_stretches,
-    df_bouys,
-    left_on="end",
-    right_on="name",
-    suffixes=["_start", "_end"],
-    how="left",
-)
-df_stretches["dx"] = (df_stretches["lon_end"] - df_stretches["lon_start"]) * 60
-df_stretches["dy"] = (df_stretches["lat_end"] - df_stretches["lat_start"]) * 60
-df_stretches["dx_nm"] = df_stretches["dx"] * LON_FACTOR
-df_stretches["dy_nm"] = df_stretches["dy"]
-df_stretches["dist"] = np.sqrt(
-    df_stretches["dx_nm"] ** 2 + df_stretches["dy"] ** 2
-)
-df_stretches["distance_diff"] = df_stretches["Afstand"] - df_stretches["dist"]
-df_stretches["heading"] = get_direction(
-    df_stretches["dx_nm"], df_stretches["dy_nm"]
-)
-df_stretches["reverse_heading"] = get_direction(
-    -df_stretches["dx_nm"], -df_stretches["dy_nm"]
-)
+G = nx.DiGraph()
 
+for i, r in legs.iterrows():
+    G.add_edge(r["start"], r["end"])
 
-# Limit to Ijsselmeer
-df = df_stretches.query("Zone_start == 'Ijsselmeer' | Zone_end == 'Ijsselmeer'")
+print("nodes", G.number_of_nodes())
+print("edges", G.number_of_edges())
 
-# %% Plots
-df_plot = df.dropna(axis="index")
-n_total = len(df)
-n_found = len(df_plot)
-
-print(f"{n_total=}, {n_found=}, n_not_found={n_total-n_found}")
-
-# Plot points and edges
-ax = sns.scatterplot(
-    data=df_bouys.query("Zone == 'Ijsselmeer'"),
-    x="lon",
-    y="lat",
-    style="Zone",
-    hue="Zone",
-)
-ax.set_aspect(1 / LON_FACTOR)
-
-for i, r in df_plot.iterrows():
-    sx, sy = r["lon_start"], r["lat_start"]
-    ex, ey = r["lon_end"], r["lat_end"]
-    ax.plot([sx, ex], [sy, ey])
-
-# Plot difference between calculated and official distance
 plt.figure()
-ax = sns.scatterplot(
-    data=df_plot,
-    x=df_plot.index,
-    y="distance_diff",
-    style="Zone_start",
-    hue="Zone_end",
+
+# nx.draw(G, with_labels=True, font_weight='bold')
+
+pos = {i: [r["lon"], r["lat"]] for i, r in bouys.iterrows()}
+
+nx.draw_networkx_nodes(G, pos, node_color="green", node_size=100)
+nx.draw_networkx_labels(G, pos)
+plt.gca().set_aspect(1 / LON_FACTOR)
+
+edge_colors = legs["speed"].values
+# edge_alphas = [(5 + i) / (M + 4) for i in range(M)]
+cmap = plt.cm.Reds
+
+edges = nx.draw_networkx_edges(
+    G,
+    pos,
+    node_size=100,
+    arrowstyle="->",
+    arrowsize=10,
+    edge_color=edge_colors,
+    edge_cmap=cmap,
+    width=1,
 )
+
+
+pc = mpl.collections.PatchCollection(edges, cmap=cmap)
+ax = plt.gca()
+plt.colorbar(pc, ax=ax)

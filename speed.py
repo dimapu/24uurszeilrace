@@ -8,6 +8,11 @@ SPEED = [0, 0, 0, 0, 4, 5, 3, 2.5]
 SPEED_SPLINE = PchipInterpolator(BEARINGS, SPEED)
 
 
+def calculate_pointing_angle(coarse: float, wind_direction: float) -> float:
+    pointing_angle =  np.abs(- np.abs((coarse - wind_direction) - 180) + 180)
+    return pointing_angle
+
+
 def get_speed(coarse: float, wind_direction: float) -> float:
     """Calculate SOG for given coarse and wind.
 
@@ -19,25 +24,42 @@ def get_speed(coarse: float, wind_direction: float) -> float:
     non-zero speed, although smaller than @ close-haul.
 
     """
-    pointing_angle = 180 - np.abs(180 - (wind_direction - coarse))
+    pointing_angle = calculate_pointing_angle(coarse, wind_direction)
 
     speed = SPEED_SPLINE(pointing_angle)
     return speed
 
 
-def plot_speed_profile():
+def plot_pointing_angle_profile(wind=0):
     plt.figure()
-    wind = np.linspace(0, 360)
-    plt.plot(wind, get_speed(0, wind))
+    
+    coarse = np.linspace(0, 360)
+    plt.plot(coarse, calculate_pointing_angle(coarse, wind))
     plt.xticks([0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360])
     plt.grid(True)
-    plt.xlabel("Pointing angle (0 = upwind, 180 = downwind)")
+    plt.xlabel("Coarse")
+    plt.ylabel(f"Pointing angle (0 = upwind, 180 = downwind). Wind is {wind}")
+
+
+
+def plot_speed_profile():
+    plt.figure()
+    
+    wind = 90
+    
+    coarse = np.linspace(0, 360)
+    plt.plot(coarse, get_speed(coarse, wind))
+    plt.xticks([0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360])
+    plt.grid(True)
+    # plt.xlabel("Coarse. Pointing angle (0 = upwind, 180 = downwind)")
+    plt.xlabel(f"Coarse. Wind is {wind}")
     plt.ylabel("Speed, knots")
 
 
 def main():
     plt.close("all")
-    plot_speed_profile()
+    # plot_speed_profile()
+    plot_pointing_angle_profile(359)
 
 
 if __name__ == "__main__":
