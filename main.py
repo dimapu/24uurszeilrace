@@ -1,21 +1,18 @@
 from pathlib import Path
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import networkx as nx
 
-from data import LON_FACTOR
+from utils.data import LON_FACTOR, get_data
+from utils.graphs import create_graph
+from utils.speed import get_speed
 
-from data import read_data, normalize_data, calculate_distances, filter_location
-from speed import get_speed
+bouys, legs = get_data()
 
-bouys, legs = read_data()
-bouys, legs = normalize_data(bouys, legs)
-legs = calculate_distances(bouys, legs)
-bouys, legs  = filter_location(bouys, legs)
-    
 
 WIND = 90
 
@@ -29,27 +26,16 @@ legs.info()
 # b = legs["lon_start"] < legs["lon_end"]
 
 
-G = nx.DiGraph()
-
-for i, r in legs.iterrows():
-    G.add_edge(r["start"], r["end"])
-
-print("nodes", G.number_of_nodes())
-print("edges", G.number_of_edges())
+G, pos = create_graph(bouys, legs)
 
 plt.figure()
-
-# nx.draw(G, with_labels=True, font_weight='bold')
-
-pos = {i: [r["lon"], r["lat"]] for i, r in bouys.iterrows()}
-
 nx.draw_networkx_nodes(G, pos, node_color="green", node_size=100)
 nx.draw_networkx_labels(G, pos)
 plt.gca().set_aspect(1 / LON_FACTOR)
 
 edge_colors = legs["speed"].values
 # edge_alphas = [(5 + i) / (M + 4) for i in range(M)]
-cmap = plt.cm.Reds
+cmap = plt.cm.YlGnBu
 
 edges = nx.draw_networkx_edges(
     G,
@@ -59,10 +45,28 @@ edges = nx.draw_networkx_edges(
     arrowsize=10,
     edge_color=edge_colors,
     edge_cmap=cmap,
-    width=1,
+    width=2,
 )
 
 
 pc = mpl.collections.PatchCollection(edges, cmap=cmap)
 ax = plt.gca()
 plt.colorbar(pc, ax=ax)
+
+
+start = pd.DataFrame(
+    # {"end": ["ENKN", "HIND", "LELYN", "MED", "OEVE", "STAV", "LEMMER"]}
+    {"end": ["MED"]}
+)
+legs = legs[["start", "end"]]
+
+# Reverse paths
+legs_inverted = pd.DataFrame()
+legs_inverted["start"] = legs["end"]
+legs_inverted["end"] = legs["start"]
+legs_all = pd.concat([legs, legs_inverted])
+
+
+from lib.graphs import make_paths
+
+res = make_paths(start, legs_all, 5)
